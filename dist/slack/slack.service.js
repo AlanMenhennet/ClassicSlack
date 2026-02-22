@@ -16,11 +16,40 @@ const config_1 = require("@nestjs/config");
 let SlackService = class SlackService {
     configService;
     slackClient;
-    users = new Map();
+    userMap = new Map();
     constructor(configService) {
         this.configService = configService;
-        const token = this.configService.get('USER_TOKEN');
+        const token = this.configService.get("USER_TOKEN");
         this.slackClient = new web_api_1.WebClient(token);
+    }
+    async getMessagesForClassic(channelId) {
+        let messageStr = "";
+        if (this.userMap.size === 0) {
+            await this.listUsers();
+        }
+        const messages = await this.fetchMessages(channelId);
+        messages?.reverse().forEach((message) => {
+            const user = this.userMap.get(message.user);
+            const userName = user
+                ? user.real_name || user.name
+                : "Unknown User";
+            messageStr += `${userName}: ${this.parseMessage(message.text)}\n`;
+        });
+        return messageStr;
+    }
+    parseMessage(message) {
+        const userMentionRegex = /<@(\w+)>/g;
+        let match;
+        while ((match = userMentionRegex.exec(message)) !== null) {
+            const userId = match[1];
+            const user = this.userMap.get(userId);
+            const userName = user
+                ? user.real_name || user.name
+                : "Unknown User";
+            console.log(`Found user mention: ${userId} (${userName})`);
+            message = message.replace(match[0], `@${userName}`);
+        }
+        return message;
     }
     async fetchMessages(channelId) {
         const result = await this.slackClient.conversations.history({
@@ -32,7 +61,7 @@ let SlackService = class SlackService {
     async postMessage(channelId, text) {
         return this.slackClient.chat.postMessage({
             channel: channelId,
-            text: text
+            text: text,
         });
     }
     async listChannels() {
@@ -42,26 +71,20 @@ let SlackService = class SlackService {
         return result.channels;
     }
     async listUsers() {
-        try {
-            const result = await this.slackClient.users.list({});
-            const users = result.members
-                ?.filter((user) => !user.is_bot && !user.deleted)
-                .map((user) => ({
-                id: user.id,
-                name: user.name,
-                real_name: user.profile?.real_name,
-                email: user.profile?.email,
-            }));
-            users.forEach((user) => {
-                console.log(user);
-                this.users.set(user.id, user);
-                console.log(this.users);
-            });
-            return this.users;
-        }
-        catch (error) {
-            throw new common_1.InternalServerErrorException(error.data || error);
-        }
+        const result = await this.slackClient.users.list({});
+        const users = result.members
+            ?.filter((user) => !user.is_bot && !user.deleted)
+            .map((user) => ({
+            id: user.id,
+            name: user.name,
+            real_name: user.profile?.real_name,
+            email: user.profile?.email,
+        }));
+        users.forEach((user) => {
+            console.log(user);
+            this.userMap.set(user.id, user);
+        });
+        return this.userMap;
     }
 };
 exports.SlackService = SlackService;

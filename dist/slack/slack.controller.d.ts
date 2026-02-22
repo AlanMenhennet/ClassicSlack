@@ -8,7 +8,9 @@ export declare class SlackController {
     getMessages(channelId: string): Promise<string>;
     postMessage(channelId: string, body: string): Promise<import("@slack/web-api").ChatPostMessageResponse>;
     getChannels(): Promise<string>;
-    getUsers(): Promise<Map<string, any>>;
+    getUsers(): Promise<{
+        [k: string]: any;
+    }>;
     redirectToSlack(res: Response): void;
     oauthCallback(code: string): Promise<{
         success: boolean;

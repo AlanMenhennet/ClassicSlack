@@ -28,8 +28,7 @@ let SlackController = class SlackController {
         this.config = config;
     }
     async getMessages(channelId) {
-        const resp = await this.slackService.fetchMessages(channelId);
-        return JSON.stringify(resp, null, 4);
+        return await this.slackService.getMessagesForClassic(channelId);
     }
     async postMessage(channelId, body) {
         console.log("POST BODY:", body);
@@ -39,7 +38,9 @@ let SlackController = class SlackController {
         return JSON.stringify(await this.slackService.listChannels(), null, 4);
     }
     async getUsers() {
-        return this.slackService.listUsers();
+        const returnedUsers = await this.slackService.listUsers();
+        console.log("RETURNED", returnedUsers);
+        return Object.fromEntries(returnedUsers);
     }
     redirectToSlack(res) {
         const clientId = this.config.get("SLACK_CLIENT_ID");
