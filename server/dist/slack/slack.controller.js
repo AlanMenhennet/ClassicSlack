@@ -27,12 +27,19 @@ let SlackController = class SlackController {
         this.slackService = slackService;
         this.config = config;
     }
+    getNewMessages(ts) {
+        console.log("GET new messages since:", ts);
+        return this.slackService.getNewMessages(parseFloat(ts));
+    }
     async getMessages(channelId) {
-        return await this.slackService.getMessagesForClassic(channelId);
+        console.log("Fetching messages for channel:", channelId);
+        const msgs = await this.slackService.getMessagesForClassic(channelId);
+        console.log(msgs);
+        return msgs;
     }
     async postMessage(channelId, body) {
         console.log("POST BODY:", body);
-        return this.slackService.postMessage(channelId, body);
+        await this.slackService.postMessage(channelId, body);
     }
     async getChannels() {
         return JSON.stringify(await this.slackService.listChannels(), null, 4);
@@ -67,14 +74,21 @@ let SlackController = class SlackController {
 };
 exports.SlackController = SlackController;
 __decorate([
-    (0, common_1.Get)("messages/:channelId"),
+    (0, common_1.Get)("messages/new/:ts"),
+    __param(0, (0, common_1.Param)("ts")),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", String)
+], SlackController.prototype, "getNewMessages", null);
+__decorate([
+    (0, common_1.Get)("messages/channel/:channelId"),
     __param(0, (0, common_1.Param)("channelId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], SlackController.prototype, "getMessages", null);
 __decorate([
-    (0, common_1.Post)("messages/:channelId"),
+    (0, common_1.Post)("messages/channel/:channelId"),
     __param(0, (0, common_1.Param)("channelId")),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),

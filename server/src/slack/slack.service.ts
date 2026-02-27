@@ -1,34 +1,82 @@
 import { Injectable } from "@nestjs/common";
 import { WebClient } from "@slack/web-api";
 import { ConfigService } from "@nestjs/config";
-import { text } from "express";
-import { async } from "rxjs";
-import { channel } from "diagnostics_channel";
+
+class Message {
+    user: string = "";
+    text: string = "";
+    ts: number = 0;
+
+    toString(): string {
+        return `${this.getFormattedDate(this.getDate())} | ${this.user}: ${this.text}`;
+    }
+
+    getDate(): Date {
+        const date = new Date(
+            parseInt(this.ts.toString().split(".")[0]) * 1000,
+        );
+        return date;
+    }
+
+    getFormattedDate(date: Date): string {
+        return date.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+    }
+}
 
 @Injectable()
 export class SlackService {
     private slackClient: WebClient;
     private userMap: Map<string, any> = new Map();
+    private messages: Message[] = [];
 
     constructor(private configService: ConfigService) {
         const token = this.configService.get<string>("USER_TOKEN");
         this.slackClient = new WebClient(token);
     }
 
-    async getMessagesForClassic(channelId: string): Promise<string> {
+    getNewMessages(ts: number): string {
+        console.log(this.messages);
+        const newMessages = this.messages.filter((message) => message.ts > ts);
+        if (newMessages.length === 0) {
+            return "";
+        }
+        return this.messagesToString(newMessages);
+    }
+
+    messagesToString(messages: Message[]): string {
         let messageStr = "";
+        messages.forEach((message) => {
+            messageStr += `${message.toString()}\r\n`;
+        });
+
+        messageStr += `LAST MESSAGE:${messages[messages.length - 1].ts} \n`;
+        return messageStr;
+    }
+
+    async getMessagesForClassic(channelId: string): Promise<string> {
+        const messageStr = "";
         if (this.userMap.size === 0) {
             await this.listUsers();
         }
         const messages = await this.fetchMessages(channelId);
+        console.log(messages);
         messages?.reverse().forEach((message) => {
-            const user = this.userMap.get(message.user!);
-            const userName = user
-                ? user.real_name || user.name
-                : "Unknown User";
-            messageStr += `${userName}: ${this.parseMessage(message.text!)}\n`;
+            const messageObj = new Message();
+            messageObj.user = this.userMap.get(message.user!).name;
+            messageObj.text = this.parseMessage(message.text!);
+            messageObj.ts = parseFloat(message.ts!);
+            this.messages.push(messageObj);
         });
-        return messageStr;
+
+        let trimmedMessages = this.messages;
+        if (this.messages.length > 10) {
+            trimmedMessages = this.messages.slice(this.messages.length - 10);
+        }
+        return this.messagesToString(trimmedMessages);
     }
 
     parseMessage(message: string): string {
@@ -40,7 +88,6 @@ export class SlackService {
             const userName = user
                 ? user.real_name || user.name
                 : "Unknown User";
-            console.log(`Found user mention: ${userId} (${userName})`);
             message = message.replace(match[0], `@${userName}`);
         }
         return message;
@@ -52,7 +99,7 @@ export class SlackService {
             limit: 50,
         });
 
-        return result.messages;
+        return result.messages!;
     }
 
     async postMessage(channelId: string, text: string) {
@@ -83,7 +130,6 @@ export class SlackService {
             }));
 
         users!.forEach((user) => {
-            console.log(user);
             this.userMap.set(user.id!, user);
         });
 

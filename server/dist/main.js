@@ -38,7 +38,10 @@ const app_module_1 = require("./app.module");
 const bodyParser = __importStar(require("body-parser"));
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
-    app.use(bodyParser.text({ type: 'text/plain' }));
+    app.use(bodyParser.text({ type: "text/plain" }));
+    const server = app.getHttpServer();
+    server.keepAliveTimeout = 60000;
+    server.headersTimeout = 65000;
     await app.listen(process.env.PORT ?? 80);
 }
 bootstrap();

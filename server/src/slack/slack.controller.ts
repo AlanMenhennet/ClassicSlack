@@ -11,18 +11,28 @@ export class SlackController {
         private readonly config: ConfigService,
     ) { }
 
-    @Get("messages/:channelId")
-    async getMessages(@Param("channelId") channelId: string): Promise<string> {
-        return await this.slackService.getMessagesForClassic(channelId);
+    @Get("messages/new/:ts")
+    getNewMessages(@Param("ts") ts: string): string {
+        console.log("GET new messages since:", ts);
+        return this.slackService.getNewMessages(parseFloat(ts));
     }
 
-    @Post("messages/:channelId")
+    @Get("messages/channel/:channelId")
+    async getMessages(@Param("channelId") channelId: string): Promise<string> {
+        console.log("Fetching messages for channel:", channelId);
+
+        const msgs = await this.slackService.getMessagesForClassic(channelId);
+        console.log(msgs);
+        return msgs;
+    }
+
+    @Post("messages/channel/:channelId")
     async postMessage(
         @Param("channelId") channelId: string,
         @Body() body: string,
-    ) {
+    ): Promise<void> {
         console.log("POST BODY:", body);
-        return this.slackService.postMessage(channelId, body);
+        await this.slackService.postMessage(channelId, body);
     }
 
     @Get("channels")

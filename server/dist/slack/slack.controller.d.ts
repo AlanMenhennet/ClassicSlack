@@ -5,8 +5,9 @@ export declare class SlackController {
     private readonly slackService;
     private readonly config;
     constructor(slackService: SlackService, config: ConfigService);
+    getNewMessages(ts: string): string;
     getMessages(channelId: string): Promise<string>;
-    postMessage(channelId: string, body: string): Promise<import("@slack/web-api").ChatPostMessageResponse>;
+    postMessage(channelId: string, body: string): Promise<void>;
     getChannels(): Promise<string>;
     getUsers(): Promise<{
         [k: string]: any;

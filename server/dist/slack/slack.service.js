@@ -13,29 +13,70 @@ exports.SlackService = void 0;
 const common_1 = require("@nestjs/common");
 const web_api_1 = require("@slack/web-api");
 const config_1 = require("@nestjs/config");
+class Message {
+    user = "";
+    text = "";
+    ts = 0;
+    toString() {
+        return `${this.getFormattedDate(this.getDate())} | ${this.user}: ${this.text}`;
+    }
+    getDate() {
+        const date = new Date(parseInt(this.ts.toString().split(".")[0]) * 1000);
+        return date;
+    }
+    getFormattedDate(date) {
+        return date.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+    }
+}
 let SlackService = class SlackService {
     configService;
     slackClient;
     userMap = new Map();
+    messages = [];
     constructor(configService) {
         this.configService = configService;
         const token = this.configService.get("USER_TOKEN");
         this.slackClient = new web_api_1.WebClient(token);
     }
-    async getMessagesForClassic(channelId) {
+    getNewMessages(ts) {
+        console.log(this.messages);
+        const newMessages = this.messages.filter((message) => message.ts > ts);
+        if (newMessages.length === 0) {
+            return "";
+        }
+        return this.messagesToString(newMessages);
+    }
+    messagesToString(messages) {
         let messageStr = "";
+        messages.forEach((message) => {
+            messageStr += `${message.toString()}\r\n`;
+        });
+        messageStr += `LAST MESSAGE:${messages[messages.length - 1].ts} \n`;
+        return messageStr;
+    }
+    async getMessagesForClassic(channelId) {
+        const messageStr = "";
         if (this.userMap.size === 0) {
             await this.listUsers();
         }
         const messages = await this.fetchMessages(channelId);
+        console.log(messages);
         messages?.reverse().forEach((message) => {
-            const user = this.userMap.get(message.user);
-            const userName = user
-                ? user.real_name || user.name
-                : "Unknown User";
-            messageStr += `${userName}: ${this.parseMessage(message.text)}\n`;
+            const messageObj = new Message();
+            messageObj.user = this.userMap.get(message.user).name;
+            messageObj.text = this.parseMessage(message.text);
+            messageObj.ts = parseFloat(message.ts);
+            this.messages.push(messageObj);
         });
-        return messageStr;
+        let trimmedMessages = this.messages;
+        if (this.messages.length > 10) {
+            trimmedMessages = this.messages.slice(this.messages.length - 10);
+        }
+        return this.messagesToString(trimmedMessages);
     }
     parseMessage(message) {
         const userMentionRegex = /<@(\w+)>/g;
@@ -46,7 +87,6 @@ let SlackService = class SlackService {
             const userName = user
                 ? user.real_name || user.name
                 : "Unknown User";
-            console.log(`Found user mention: ${userId} (${userName})`);
             message = message.replace(match[0], `@${userName}`);
         }
         return message;
@@ -81,7 +121,6 @@ let SlackService = class SlackService {
             email: user.profile?.email,
         }));
         users.forEach((user) => {
-            console.log(user);
             this.userMap.set(user.id, user);
         });
         return this.userMap;
