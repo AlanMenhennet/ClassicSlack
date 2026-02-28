@@ -1,25 +1,22 @@
 import { ConfigService } from "@nestjs/config";
-declare class Message {
-    user: string;
-    text: string;
-    ts: number;
-    toString(): string;
-    getDate(): Date;
-    getFormattedDate(date: Date): string;
-}
+import { SlackerMessage } from "src/model/SlackerMessage";
 export declare class SlackService {
     private configService;
     private slackClient;
     private userMap;
     private messages;
+    private channels;
     constructor(configService: ConfigService);
+    init(): Promise<void>;
     getNewMessages(ts: number): string;
-    messagesToString(messages: Message[]): string;
+    messagesToString(messages: SlackerMessage[]): string;
     getMessagesForClassic(channelId: string): Promise<string>;
     parseMessage(message: string): string;
     fetchMessages(channelId: string): Promise<import("@slack/web-api/dist/types/response/ConversationsHistoryResponse").MessageElement[]>;
     postMessage(channelId: string, text: string): Promise<import("@slack/web-api").ChatPostMessageResponse>;
-    listChannels(): Promise<import("@slack/web-api/dist/types/response/ConversationsListResponse").Channel[] | undefined>;
-    listUsers(): Promise<Map<string, any>>;
+    getChannels(): string;
+    getUsers(): string;
+    fetchChannels(): Promise<void>;
+    getSidebar(): Promise<string>;
+    fetchUsers(): Promise<Map<string, any>>;
 }
-export {};

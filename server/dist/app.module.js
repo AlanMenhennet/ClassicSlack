@@ -10,12 +10,17 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const slack_module_1 = require("./slack/slack.module");
+const event_emitter_1 = require("@nestjs/event-emitter");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule.forRoot({ isGlobal: true }), slack_module_1.SlackModule],
+        imports: [
+            config_1.ConfigModule.forRoot({ isGlobal: true }),
+            slack_module_1.SlackModule,
+            event_emitter_1.EventEmitterModule.forRoot(),
+        ],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

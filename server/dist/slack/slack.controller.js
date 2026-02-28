@@ -20,21 +20,51 @@ const common_1 = require("@nestjs/common");
 const slack_service_1 = require("./slack.service");
 const axios_1 = __importDefault(require("axios"));
 const config_1 = require("@nestjs/config");
+const event_emitter_1 = require("@nestjs/event-emitter");
 let SlackController = class SlackController {
     slackService;
     config;
-    constructor(slackService, config) {
+    eventEmitter;
+    configService;
+    LONG_POLL_TIMEOUT = 0;
+    constructor(slackService, config, eventEmitter, configService) {
         this.slackService = slackService;
         this.config = config;
+        this.eventEmitter = eventEmitter;
+        this.configService = configService;
+        this.LONG_POLL_TIMEOUT =
+            this.configService.get("LONG_POLL_TIMEOUT");
+        if (this.LONG_POLL_TIMEOUT == 0 || isNaN(this.LONG_POLL_TIMEOUT)) {
+            throw new Error("Invalid LONG_POLL_TIMEOUT value");
+        }
     }
     getNewMessages(ts) {
         console.log("GET new messages since:", ts);
-        return this.slackService.getNewMessages(parseFloat(ts));
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                this.eventEmitter.removeListener("slack_event", handler);
+                resolve("timeout");
+            }, this.LONG_POLL_TIMEOUT);
+            const handler = (event) => {
+                console.log("EVENT:", event);
+                clearTimeout(timeout);
+                const messages = this.slackService.getNewMessages(parseFloat(ts));
+                resolve(messages);
+            };
+            this.eventEmitter.once("slack_event", handler);
+        });
+    }
+    async handleEvent(body) {
+        console.log("Received event via webhook");
+        if (body.event && body.event.type === "message") {
+            await this.getMessages(body.event.channel);
+            this.eventEmitter.emit("slack_event", body.event);
+        }
+        return body.challenge;
     }
     async getMessages(channelId) {
-        console.log("Fetching messages for channel:", channelId);
         const msgs = await this.slackService.getMessagesForClassic(channelId);
-        console.log(msgs);
+        console.log("Fetched messages for channel:", channelId);
         return msgs;
     }
     async postMessage(channelId, body) {
@@ -42,12 +72,13 @@ let SlackController = class SlackController {
         await this.slackService.postMessage(channelId, body);
     }
     async getChannels() {
-        return JSON.stringify(await this.slackService.listChannels(), null, 4);
+        return this.slackService.getChannels();
+    }
+    async getSidebar() {
+        return this.slackService.getSidebar();
     }
     async getUsers() {
-        const returnedUsers = await this.slackService.listUsers();
-        console.log("RETURNED", returnedUsers);
-        return Object.fromEntries(returnedUsers);
+        return this.slackService.getUsers();
     }
     redirectToSlack(res) {
         const clientId = this.config.get("SLACK_CLIENT_ID");
@@ -78,8 +109,15 @@ __decorate([
     __param(0, (0, common_1.Param)("ts")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", String)
+    __metadata("design:returntype", Promise)
 ], SlackController.prototype, "getNewMessages", null);
+__decorate([
+    (0, common_1.Post)("event"),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], SlackController.prototype, "handleEvent", null);
 __decorate([
     (0, common_1.Get)("messages/channel/:channelId"),
     __param(0, (0, common_1.Param)("channelId")),
@@ -101,6 +139,12 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], SlackController.prototype, "getChannels", null);
+__decorate([
+    (0, common_1.Get)("sidebar"),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], SlackController.prototype, "getSidebar", null);
 __decorate([
     (0, common_1.Get)("users"),
     __metadata("design:type", Function),
@@ -124,6 +168,8 @@ __decorate([
 exports.SlackController = SlackController = __decorate([
     (0, common_1.Controller)("slack"),
     __metadata("design:paramtypes", [slack_service_1.SlackService,
+        config_1.ConfigService,
+        event_emitter_1.EventEmitter2,
         config_1.ConfigService])
 ], SlackController);
 //# sourceMappingURL=slack.controller.js.map

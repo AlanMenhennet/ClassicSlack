@@ -4,6 +4,12 @@ import * as bodyParser from "body-parser";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+
+    app.use((req, res, next) => {
+        console.log(`${req.method} ${req.url}`);
+        next();
+    });
+
     app.use(bodyParser.text({ type: "text/plain" }));
     const server = app.getHttpServer();
     server.keepAliveTimeout = 60000;

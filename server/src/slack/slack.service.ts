@@ -1,41 +1,25 @@
 import { Injectable } from "@nestjs/common";
 import { WebClient } from "@slack/web-api";
 import { ConfigService } from "@nestjs/config";
-
-class Message {
-    user: string = "";
-    text: string = "";
-    ts: number = 0;
-
-    toString(): string {
-        return `${this.getFormattedDate(this.getDate())} | ${this.user}: ${this.text}`;
-    }
-
-    getDate(): Date {
-        const date = new Date(
-            parseInt(this.ts.toString().split(".")[0]) * 1000,
-        );
-        return date;
-    }
-
-    getFormattedDate(date: Date): string {
-        return date.toLocaleTimeString("en-US", {
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-        });
-    }
-}
+import { SlackerMessage } from "src/model/SlackerMessage";
+import { SlackerChannel } from "src/model/SlackerChannel";
 
 @Injectable()
 export class SlackService {
     private slackClient: WebClient;
     private userMap: Map<string, any> = new Map();
-    private messages: Message[] = [];
+    private messages: SlackerMessage[] = [];
+    private channels: SlackerChannel[] = [];
 
     constructor(private configService: ConfigService) {
         const token = this.configService.get<string>("USER_TOKEN");
         this.slackClient = new WebClient(token);
+        this.init();
+    }
+
+    async init(): Promise<void> {
+        await this.fetchUsers();
+        await this.fetchChannels();
     }
 
     getNewMessages(ts: number): string {
@@ -47,7 +31,7 @@ export class SlackService {
         return this.messagesToString(newMessages);
     }
 
-    messagesToString(messages: Message[]): string {
+    messagesToString(messages: SlackerMessage[]): string {
         let messageStr = "";
         messages.forEach((message) => {
             messageStr += `${message.toString()}\r\n`;
@@ -58,14 +42,9 @@ export class SlackService {
     }
 
     async getMessagesForClassic(channelId: string): Promise<string> {
-        const messageStr = "";
-        if (this.userMap.size === 0) {
-            await this.listUsers();
-        }
         const messages = await this.fetchMessages(channelId);
-        console.log(messages);
         messages?.reverse().forEach((message) => {
-            const messageObj = new Message();
+            const messageObj = new SlackerMessage();
             messageObj.user = this.userMap.get(message.user!).name;
             messageObj.text = this.parseMessage(message.text!);
             messageObj.ts = parseFloat(message.ts!);
@@ -109,16 +88,134 @@ export class SlackService {
         });
     }
 
-    async listChannels() {
+    getChannels(): string {
+        return this.channels.map((channel) => `#${channel.name}`).join("\n");
+    }
+
+    getUsers(): string {
+        let users = "";
+
+        this.userMap.forEach((user) => {
+            console.log(user);
+            users += `@${user.name}\n`;
+        });
+        return users;
+    }
+
+    async fetchChannels(): Promise<void> {
         const result = await this.slackClient.conversations.list({
             types: "public_channel,private_channel",
         });
 
-        return result.channels;
+        const slackerChannels: SlackerChannel[] = [];
+        result.channels?.forEach((channel) => {
+            const slackerChannel = new SlackerChannel();
+            slackerChannel.id = channel.id!;
+            slackerChannel.name = channel.name!;
+            slackerChannels.push(slackerChannel);
+        });
+        this.channels = slackerChannels;
     }
 
-    async listUsers() {
+    async getSidebar(): Promise<string> {
+        let sidebar = this.getUsers();
+        sidebar += "------\n";
+        sidebar += this.getChannels();
+        return sidebar;
+    }
+
+    async fetchUsers() {
+        /*
         const result = await this.slackClient.users.list({});
+        */
+
+        const result = {
+            ok: true,
+            members: [
+                {
+                    id: "USLACKBOT",
+                    name: "slackbot",
+                    is_bot: false,
+                    updated: 0,
+                    is_app_user: false,
+                    team_id: "T0AGX0GDVPA",
+                    deleted: false,
+                    color: "757575",
+                    is_email_confirmed: false,
+                    real_name: "Slackbot",
+                    tz: "America/Los_Angeles",
+                    tz_label: "Pacific Standard Time",
+                    tz_offset: -28800,
+                    is_admin: false,
+                    is_owner: false,
+                    is_primary_owner: false,
+                    is_restricted: false,
+                    is_ultra_restricted: false,
+                    who_can_share_contact_card: "EVERYONE",
+                    profile: [Object],
+                },
+                {
+                    id: "U0AFZ97V5TP",
+                    name: "alan",
+                    is_bot: false,
+                    updated: 1771550632,
+                    is_app_user: false,
+                    team_id: "T0AGX0GDVPA",
+                    deleted: false,
+                    color: "73769d",
+                    is_email_confirmed: true,
+                    real_name: "alan",
+                    tz: "Australia/Canberra",
+                    tz_label: "Australian Eastern Daylight Time",
+                    tz_offset: 39600,
+                    is_admin: true,
+                    is_owner: true,
+                    is_primary_owner: true,
+                    is_restricted: false,
+                    is_ultra_restricted: false,
+                    has_2fa: false,
+                    who_can_share_contact_card: "EVERYONE",
+                    profile: [Object],
+                },
+                {
+                    id: "U0AG0KJJ2JJ",
+                    name: "demo_app",
+                    is_bot: true,
+                    updated: 1771550844,
+                    is_app_user: false,
+                    team_id: "T0AGX0GDVPA",
+                    deleted: false,
+                    color: "d1707d",
+                    is_email_confirmed: false,
+                    real_name: "Demo App",
+                    tz: "America/Los_Angeles",
+                    tz_label: "Pacific Standard Time",
+                    tz_offset: -28800,
+                    is_admin: false,
+                    is_owner: false,
+                    is_primary_owner: false,
+                    is_restricted: false,
+                    is_ultra_restricted: false,
+                    who_can_share_contact_card: "EVERYONE",
+                    profile: [Object],
+                },
+            ],
+            cache_ts: 1772255186,
+            response_metadata: {
+                next_cursor: "",
+                scopes: [
+                    "identify",
+                    "channels:history",
+                    "channels:read",
+                    "groups:read",
+                    "im:read",
+                    "mpim:read",
+                    "users:read",
+                    "chat:write",
+                ],
+                acceptedScopes: ["users:read"],
+            },
+        } as any;
 
         const users = result.members
             ?.filter((user) => !user.is_bot && !user.deleted)
@@ -129,8 +226,8 @@ export class SlackService {
                 email: user.profile?.email,
             }));
 
-        users!.forEach((user) => {
-            this.userMap.set(user.id!, user);
+        users.forEach((user) => {
+            this.userMap.set(user.id, user);
         });
 
         return this.userMap;
